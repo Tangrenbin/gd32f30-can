@@ -205,12 +205,16 @@ uint8_t gd_eval_key_state_get(key_typedef_enum key)
 void gd_eval_com_init(uint32_t com)
 {
     uint32_t com_id = 0U;
-    if(EVAL_COM1 == com){
+    
+    if (EVAL_COM1 == com)
+    {
         com_id = 0U;
-    }else if(EVAL_COM2 == com){
+    }
+    else if (EVAL_COM2 == com)
+    {
         com_id = 1U;
     }
-    
+
     /* enable GPIO clock */
     rcu_periph_clock_enable(COM_GPIO_CLK[com_id]);
 

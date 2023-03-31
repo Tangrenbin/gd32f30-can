@@ -109,29 +109,29 @@ void gpio_afio_deinit(void)
 }
 
 /*!
-    \brief      GPIO parameter initialization
-    \param[in]  gpio_periph: GPIOx(x = A,B,C,D,E,F,G) 
-    \param[in]  mode: gpio pin mode
-                only one parameter can be selected which is shown as below:
-      \arg        GPIO_MODE_AIN: analog input mode
-      \arg        GPIO_MODE_IN_FLOATING: floating input mode
-      \arg        GPIO_MODE_IPD: pull-down input mode
-      \arg        GPIO_MODE_IPU: pull-up input mode
-      \arg        GPIO_MODE_OUT_OD: GPIO output with open-drain
-      \arg        GPIO_MODE_OUT_PP: GPIO output with push-pull
-      \arg        GPIO_MODE_AF_OD: AFIO output with open-drain
-      \arg        GPIO_MODE_AF_PP: AFIO output with push-pull
-    \param[in]  speed: gpio output max speed value
-                only one parameter can be selected which is shown as below:
-      \arg        GPIO_OSPEED_10MHZ: output max speed 10MHz
-      \arg        GPIO_OSPEED_2MHZ: output max speed 2MHz
-      \arg        GPIO_OSPEED_50MHZ: output max speed 50MHz
-      \arg        GPIO_OSPEED_MAX: output max speed more than 50MHz
-    \param[in]  pin: GPIO pin
-                one or more parameters can be selected which are shown as below:
-      \arg        GPIO_PIN_x(x=0..15), GPIO_PIN_ALL
-    \param[out] none
-    \retval     none
+\brief GPIO参数初始化
+\param[in] gpio_periph: GPIOx(x = A,B,C,D,E,F,G)
+\param[in] mode: GPIO引脚模式
+只能选择一个参数，如下所示：
+\arg GPIO_MODE_AIN: 模拟输入模式
+\arg GPIO_MODE_IN_FLOATING: 浮空输入模式
+\arg GPIO_MODE_IPD: 下拉输入模式
+\arg GPIO_MODE_IPU: 上拉输入模式
+\arg GPIO_MODE_OUT_OD: 开漏输出GPIO模式
+\arg GPIO_MODE_OUT_PP: 推挽输出GPIO模式
+\arg GPIO_MODE_AF_OD: 开漏输出AFIO模式
+\arg GPIO_MODE_AF_PP: 推挽输出AFIO模式
+\param[in] speed: GPIO输出最大速度值
+只能选择一个参数，如下所示：
+\arg GPIO_OSPEED_10MHZ: 输出最大速度10MHz
+\arg GPIO_OSPEED_2MHZ: 输出最大速度2MHz
+\arg GPIO_OSPEED_50MHZ: 输出最大速度50MHz
+\arg GPIO_OSPEED_MAX: 输出最大速度大于50MHz
+\param[in] pin: GPIO引脚
+可以选择一个或多个参数，如下所示：
+\arg GPIO_PIN_x(x=0..15), GPIO_PIN_ALL
+\param[out] 无
+\retval 无
 */
 void gpio_init(uint32_t gpio_periph, uint32_t mode, uint32_t speed, uint32_t pin)
 {
@@ -141,37 +141,47 @@ void gpio_init(uint32_t gpio_periph, uint32_t mode, uint32_t speed, uint32_t pin
 
     /* GPIO mode configuration */
     temp_mode = (uint32_t)(mode & ((uint32_t)0x0FU));
-    
+
     /* GPIO speed configuration */
-    if(((uint32_t)0x00U) != ((uint32_t)mode & ((uint32_t)0x10U))){
+    if (((uint32_t)0x00U) != ((uint32_t)mode & ((uint32_t)0x10U)))
+    {
         /* output mode max speed */
-        if(GPIO_OSPEED_MAX == (uint32_t)speed){
+        if (GPIO_OSPEED_MAX == (uint32_t)speed)
+        {
             temp_mode |= (uint32_t)0x03U;
             /* set the corresponding SPD bit */
-            GPIOx_SPD(gpio_periph) |= (uint32_t)pin ;
-        }else{
+            GPIOx_SPD(gpio_periph) |= (uint32_t)pin;
+        }
+        else
+        {
             /* output mode max speed:10MHz,2MHz,50MHz */
             temp_mode |= (uint32_t)speed;
         }
     }
 
     /* configure the eight low port pins with GPIO_CTL0 */
-    for(i = 0U;i < 8U;i++){
-        if((1U << i) & pin){
+    for (i = 0U; i < 8U; i++)
+    {
+        if ((1U << i) & pin)
+        {
             reg = GPIO_CTL0(gpio_periph);
-            
+
             /* clear the specified pin mode bits */
             reg &= ~GPIO_MODE_MASK(i);
             /* set the specified pin mode bits */
             reg |= GPIO_MODE_SET(i, temp_mode);
-            
+
             /* set IPD or IPU */
-            if(GPIO_MODE_IPD == mode){
+            if (GPIO_MODE_IPD == mode)
+            {
                 /* reset the corresponding OCTL bit */
                 GPIO_BC(gpio_periph) = (uint32_t)((1U << i) & pin);
-            }else{
+            }
+            else
+            {
                 /* set the corresponding OCTL bit */
-                if(GPIO_MODE_IPU == mode){
+                if (GPIO_MODE_IPU == mode)
+                {
                     GPIO_BOP(gpio_periph) = (uint32_t)((1U << i) & pin);
                 }
             }
@@ -180,22 +190,28 @@ void gpio_init(uint32_t gpio_periph, uint32_t mode, uint32_t speed, uint32_t pin
         }
     }
     /* configure the eight high port pins with GPIO_CTL1 */
-    for(i = 8U;i < 16U;i++){
-        if((1U << i) & pin){
+    for (i = 8U; i < 16U; i++)
+    {
+        if ((1U << i) & pin)
+        {
             reg = GPIO_CTL1(gpio_periph);
-            
+
             /* clear the specified pin mode bits */
             reg &= ~GPIO_MODE_MASK(i - 8U);
             /* set the specified pin mode bits */
             reg |= GPIO_MODE_SET(i - 8U, temp_mode);
-            
+
             /* set IPD or IPU */
-            if(GPIO_MODE_IPD == mode){
+            if (GPIO_MODE_IPD == mode)
+            {
                 /* reset the corresponding OCTL bit */
                 GPIO_BC(gpio_periph) = (uint32_t)((1U << i) & pin);
-            }else{
+            }
+            else
+            {
                 /* set the corresponding OCTL bit */
-                if(GPIO_MODE_IPU == mode){
+                if (GPIO_MODE_IPU == mode)
+                {
                     GPIO_BOP(gpio_periph) = (uint32_t)((1U << i) & pin);
                 }
             }
