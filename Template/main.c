@@ -3,128 +3,194 @@
 #include "main.h"
 #include "gd32f30x_gpio.h"
 
-/* can½ÓÊÕ±êÖ¾Î» */
-FlagStatus can0_receive_flag;
-/* can´íÎó±êÖ¾Î» */
-FlagStatus can0_error_flag;
-/* CAN·¢ËÍ²ÎÊı³õÊ¼»¯ */
-static const can_trasnmit_message_struct transmit_message_init = {
-    .tx_efid = 0x00,          // ³õÊ¼»¯À©Õ¹Ö¡ID
-    .tx_ft = CAN_FT_DATA,     // ³õÊ¼»¯·¢ËÍÊı¾İÖ¡ÀàĞÍ
-    .tx_ff = CAN_FF_STANDARD, // ³õÊ¼»¯·¢ËÍÊı¾İÖ¡¸ñÊ½Îª±ê×¼Ö¡
-    .tx_dlen = 8,             // ³õÊ¼»¯·¢ËÍÊı¾İµÄ³¤¶ÈÎª8
-};
+/* è§’è‰² */
+#define ROLE (e_master)
+// #define ROLE (e_slave_0)
+/* CANå‘é€å‚æ•° */
+can_trasnmit_message_struct transmit_message;
+/* CANæ¥æ”¶å‚æ•° */
+can_receive_message_struct receive_message;
+/* CANæ»¤æ³¢å™¨å‚æ•° */
+can_filter_parameter_struct can_filter;
+/* é€šä¿¡ID */
+COMMUNICATION_ID_t communication_id[SLAVE_COUNT];
+
+/* ç¡®è®¤å¸§æ ¼å¼ */
+const uint8_t sack_frame [8] = {0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
+/* æ•°æ®å¸§æ ¼å¼ */
+const uint8_t data_frame [8] = {0x11,0x11,0x11,0x11,0x11,0x11,0x11,0x11};
+/* ä»èŠ‚ç‚¹åºå· */
+uint8_t g_slave_index = 0;
 
 int main(void)
 {
-    // ³õÊ¼»¯CAN0
-    __can_init__();
+    /* é…ç½®GPIOå¼•è„š */
+    can_gpio_config();
 
-    // ÅäÖÃÖĞ¶ÏÏòÁ¿±í
+    /* åˆå§‹åŒ–canæ¥æ”¶å‚æ•° */
+    can_struct_para_init(CAN_RX_MESSAGE_STRUCT, &receive_message);
+
+    /* åˆå§‹åŒ–canå‘é€å‚æ•°  */
+    can_struct_para_init(CAN_TX_MESSAGE_STRUCT, &transmit_message);
+
+    /* é…ç½®ä¸­æ–­å‘é‡è¡¨ */
     nvic_config();
 
-    /* ³õÊ¼»¯´®¿Ú0 */
+    /* åˆå§‹åŒ–ä¸²å£0 */
     uart0_init();
 
-    // ³õÊ¼»¯LED
+    /* åˆå§‹åŒ–LED */
     led_init();
 
-    /* ³õÊ¼»¯CANºÍ¹ıÂËÆ÷ */
+    /* åˆå§‹åŒ–CANå’Œè¿‡æ»¤å™¨ */
     can_config();
+    
+    /* åˆå§‹åŒ–é€šä¿¡id */
+    init_communication_id();
+
+    if (ROLE == e_master)
+    {
+        /* é…ç½®å®šæ—¶å™¨3 */
+        timer3_init(5000); // å®šæ—¶å™¨3æ¯5000ï¼ˆ5ç§’ï¼‰ä¸ªè®¡æ•°å‘¨æœŸäº§ç”Ÿä¸€æ¬¡ä¸­æ–­è¿›è¡Œä¸»èŠ‚ç‚¹å‘¨æœŸå‘é€ä»»åŠ¡
+    }
+    else
+    {
+        slave_task(ROLE);
+    }
 
     while (1)
     {
-        if (ROLE == e_master)
-        {
-            can_send_data(0x11, 0x51);
-            receive_data();
-        }
+
     }
 }
 
-void __can_init__()
-{
-    can0_receive_flag = RESET; // ½«CAN0½ÓÊÕ±êÖ¾ÇåÁã
-    can0_error_flag = RESET;   // ½«CAN0´íÎó±êÖ¾ÇåÁã
+/**
 
-    can_gpio_config(); // ÅäÖÃGPIOÒı½Å
-    printf("\r\ncan init success !\r\n");
+@brief ä¸»ä»»åŠ¡å‡½æ•°ï¼Œå‘æŒ‡å®šä»èŠ‚ç‚¹å‘é€æ•°æ®å¹¶é…ç½®CANè¿‡æ»¤å™¨
+
+@param[in] slave_index æŒ‡å®šä»èŠ‚ç‚¹çš„ç´¢å¼•
+
+@note æ•°æ®å‘é€æ ‡è¯†ç¬¦ä¸ºæŒ‡å®šä»èŠ‚ç‚¹çš„ä¸»æ”¶æ ‡è¯†ç¬¦ï¼Œæ•°æ®å†…å®¹ä¸ºå›ºå®šçš„11 11 11 11 11 11 11 11
+
+@note æ•°æ®å‘é€åä¼šæ”¶åˆ°ä»èŠ‚ç‚¹çš„ç¡®è®¤å¸§ï¼Œä¸»èŠ‚ç‚¹éœ€è¦å›å¤ç¡®è®¤å¸§
+
+@note ç¡®è®¤å¸§æ•°æ®å†…å®¹æ ¼å¼å›ºå®šä¸ºï¼šFF FF FF FF FF FF FF FFï¼Œé•¿åº¦å›ºå®šä¸º8ä¸ªå­—èŠ‚
+
+@note ä¸»èŠ‚ç‚¹ç¯è¯­ï¼šæ¥æ”¶æ•°æ®æ—¶é—ªçƒç»¿è‰²LEDï¼Œå‘é€æ•°æ®æ—¶é—ªçƒçº¢è‰²LED
+
+@note ä¸»èŠ‚ç‚¹å‘é€æ•°æ®åä¼šé…ç½®CANè¿‡æ»¤å™¨ä»¥æ¥æ”¶ä»èŠ‚ç‚¹çš„ç¡®è®¤å¸§
+
+@note ä¸»èŠ‚ç‚¹ä¼šæŒ‰ç…§ä»èŠ‚ç‚¹çš„ç´¢å¼•ä¾æ¬¡å‘é€æ•°æ®ï¼Œå½“ç´¢å¼•è¾¾åˆ°æœ€å¤§å€¼æ—¶é‡æ–°ä»0å¼€å§‹å¾ªç¯
+*/
+void master_task(const uint8_t slave_index)
+{
+    // å‘æŒ‡å®šä»èŠ‚ç‚¹å‘é€æ•°æ®
+    can_send_data(SEND_DATA, communication_id[slave_index].master_tx_id);
+
+    // é…ç½®CANè¿‡æ»¤å™¨ä»¥æ¥æ”¶ä»èŠ‚ç‚¹çš„ç¡®è®¤å¸§
+    config_can0_filter(communication_id[slave_index].slave_rx_id);
+
+    // æ›´æ–°ä¸‹ä¸€ä¸ªä»èŠ‚ç‚¹çš„ç´¢å¼•
+    g_slave_index = (slave_index + 1) % SLAVE_COUNT;
 }
+
+void slave_task(const uint8_t slave_seq)
+{
+    config_slave_communication_id(slave_seq);
+}
+
+void config_slave_communication_id(const uint8_t slave_seq)
+{
+    // é…ç½®CANè¿‡æ»¤å™¨ä»¥æ¥æ”¶ä¸»èŠ‚ç‚¹çš„ç¡®è®¤å¸§
+    if (slave_seq < SLAVE_COUNT)
+    {
+        config_can0_filter(communication_id[slave_seq].slave_rx_id);
+    }
+}
+
 
 void can_send_data(const uint8_t send_data, const uint32_t tx_sfid)
 {
-    uint32_t timeout = 0xFFFF;    // ³õÊ¼»¯·¢ËÍ³¬Ê±Ê±¼äÎª0xFFFF
-    uint8_t transmit_mailbox = 0; // ¶¨Òå·¢ËÍÓÊÏä±àºÅÎª0
+    uint32_t timeout = 0xFFFF;    // åˆå§‹åŒ–å‘é€è¶…æ—¶æ—¶é—´ä¸º0xFFFF
+    uint8_t transmit_mailbox = 0; // å®šä¹‰å‘é€é‚®ç®±ç¼–å·ä¸º0
 
-    can_trasnmit_message_struct transmit_message = transmit_message_init;          // ½«·¢ËÍÏûÏ¢µÄ³õÊ¼ÖµÉèÖÃÎªtransmit_message_init
-    transmit_message.tx_sfid = tx_sfid;                                            // ½«·¢ËÍÏûÏ¢µÄ±ê×¼Ö¡IDÉèÖÃÎªtx_sfid
-    memset(transmit_message.tx_data, send_data, sizeof(transmit_message.tx_data)); // ½«·¢ËÍÊı¾İµÄÄÚÈİÉèÖÃÎªsend_data
+    transmit_message.tx_sfid = tx_sfid;                                            // å°†å‘é€æ¶ˆæ¯çš„æ ‡å‡†å¸§IDè®¾ç½®ä¸ºtx_sfid
+    memset(transmit_message.tx_data, send_data, sizeof(transmit_message.tx_data)); // å°†å‘é€æ•°æ®çš„å†…å®¹è®¾ç½®ä¸ºsend_data
 
-    transmit_mailbox = can_message_transmit(CAN0, &transmit_message); // ·¢ËÍCANÏûÏ¢
+    transmit_mailbox = can_message_transmit(CAN0, &transmit_message); // å‘é€CANæ¶ˆæ¯
 
     while (can_transmit_states(CAN0, transmit_mailbox) != CAN_TRANSMIT_OK && timeout--)
-        ; // µÈ´ı·¢ËÍÍê³É
+        ; // ç­‰å¾…å‘é€å®Œæˆ
 
-    printf("\r\ntx: ");
-    for (uint8_t i = 0; i < 8; i++) // ±éÀú·¢ËÍÊı¾İ
+    led_twinkle(e_red_led);
+
+    printf("\r\ntx [%02x]: ",transmit_message.tx_sfid);
+    for (uint8_t i = 0; i < transmit_message.tx_dlen; i++) // éå†å‘é€æ•°æ®
     {
-        printf("%02x ", transmit_message.tx_data[i]); // ´òÓ¡Ã¿Ò»¸öÊı¾İ
+        printf("%02x ", transmit_message.tx_data[i]); // æ‰“å°æ¯ä¸€ä¸ªæ•°æ®
     }
-    printf("\r\n"); // »»ĞĞ
+    printf("\r\n"); // æ¢è¡Œ
 }
 
-void receive_data()
+void ckeck_receive_data(void)
 {
-    can_receive_message_struct receive_message;
-
-    /* Èç¹ûCAN0ÕıÈ·½ÓÊÕµ½Êı¾İ£¬´òÓ¡½ÓÊÕµ½µÄÊı¾İ */
-    if (SET == can0_receive_flag)
+    if (ROLE == e_master)
     {
-        can0_receive_flag = RESET;
-        printf("\r\n can0 receive data:");
-        for (uint8_t i = 0; i < receive_message.rx_dlen; i++)
+        if ((communication_id[g_slave_index].master_rx_id == receive_message.rx_sfid) &&
+            (CAN_FF_STANDARD == receive_message.rx_ff) &&
+            (8 == receive_message.rx_dlen) &&
+            (0 == memcmp(receive_message.rx_data, sack_frame, sizeof(sack_frame))))
         {
-            printf(" %02x", receive_message.rx_data[i]);
+            printf("\r\ncheck receive data success , start send sack frame to slave !\r\n");
+            can_send_data(0xff, communication_id[g_slave_index].master_tx_id); // å›å¤ç¡®è®¤å¸§
+        }
+        else
+        {
+            printf("\r\ncheck receive data fail !\r\n");
         }
     }
-
-    if (SET == can0_error_flag)
+    else if (ROLE < SLAVE_COUNT)
     {
-        can0_error_flag = RESET;                 // Çå³ıCAN0´íÎó±êÖ¾Î»
-        printf("\r\n can0 communication error"); // ´òÓ¡CAN0Í¨ĞÅ´íÎóĞÅÏ¢
+        // cppcheck-suppress arrayIndexOutOfBounds
+        if ((receive_message.rx_sfid == communication_id[ROLE].master_tx_id) &&
+            (CAN_FF_STANDARD == receive_message.rx_ff) &&
+            (8 == receive_message.rx_dlen) &&
+            (0 == memcmp(receive_message.rx_data, data_frame, sizeof(sack_frame))))
+        {
+            printf("\r\ncheck receive data success , start send sack frame to master !\r\n");
+            // cppcheck-suppress arrayIndexOutOfBounds
+            can_send_data(0xff, communication_id[ROLE].slave_tx_id); // å›å¤ç¡®è®¤å¸§
+        }
     }
 }
-
 /*
- * º¯ÊıÃû£ºcan_config
- * ¹¦ÄÜÃèÊö£ºÅäÖÃCAN×ÜÏß
- * ÊäÈë²ÎÊı£ºÎŞ
- * Êä³ö²ÎÊı£ºÎŞ
+ * å‡½æ•°åï¼šcan_config
+ * åŠŸèƒ½æè¿°ï¼šé…ç½®CANæ€»çº¿
+ * è¾“å…¥å‚æ•°ï¼šæ— 
+ * è¾“å‡ºå‚æ•°ï¼šæ— 
  */
-void can_config()
+void can_config(void)
 {
-    can_parameter_struct can_parameter;     // CAN²ÎÊı½á¹¹Ìå
-    can_filter_parameter_struct can_filter; // CANÂË²¨Æ÷²ÎÊı½á¹¹Ìå
+    can_parameter_struct can_parameter;     // CANå‚æ•°ç»“æ„ä½“   
 
-    can_struct_para_init(CAN_INIT_STRUCT, &can_parameter); // ³õÊ¼»¯CAN²ÎÊı½á¹¹Ìå
-    can_struct_para_init(CAN_FILTER_STRUCT, &can_filter);  // ³õÊ¼»¯CANÂË²¨Æ÷²ÎÊı½á¹¹Ìå
+    can_struct_para_init(CAN_INIT_STRUCT, &can_parameter); // åˆå§‹åŒ–CANå‚æ•°ç»“æ„ä½“
 
-    /* ³õÊ¼»¯CAN¼Ä´æÆ÷ */
+    /* åˆå§‹åŒ–CANå¯„å­˜å™¨ */
     can_deinit(CAN0);
 
-    /* ÅäÖÃCAN²ÎÊı */
-    can_parameter.time_triggered = DISABLE;           // ·ÇÊ±¼ä´¥·¢Ä£Ê½
-    can_parameter.auto_bus_off_recovery = ENABLE;     // ×Ô¶¯×ÜÏß¹Ø±Õ»Ö¸´
-    can_parameter.auto_wake_up = DISABLE;             // ²»×Ô¶¯»½ĞÑ
-    can_parameter.auto_retrans = ENABLE;              // ×Ô¶¯ÖØ´«
-    can_parameter.rec_fifo_overwrite = DISABLE;       // ½ÓÊÕFIFO²»Òç³ö
-    can_parameter.trans_fifo_order = DISABLE;         // ·¢ËÍFIFO²»°´Ë³Ğò
-    can_parameter.working_mode = CAN_NORMAL_MODE;     // Õı³£¹¤×÷Ä£Ê½
-    can_parameter.resync_jump_width = CAN_BT_SJW_1TQ; // ÖØĞÂÍ¬²½Ìø×ª¿í¶È
-    can_parameter.time_segment_1 = CAN_BT_BS1_7TQ;    // Ê±¼ä¶Î1
-    can_parameter.time_segment_2 = CAN_BT_BS2_2TQ;    // Ê±¼ä¶Î2
+    /* é…ç½®CANå‚æ•° */
+    can_parameter.time_triggered = DISABLE;           // éæ—¶é—´è§¦å‘æ¨¡å¼
+    can_parameter.auto_bus_off_recovery = ENABLE;     // è‡ªåŠ¨æ€»çº¿å…³é—­æ¢å¤
+    can_parameter.auto_wake_up = DISABLE;             // ä¸è‡ªåŠ¨å”¤é†’
+    can_parameter.auto_retrans = ENABLE;              // è‡ªåŠ¨é‡ä¼ 
+    can_parameter.rec_fifo_overwrite = DISABLE;       // æ¥æ”¶FIFOä¸æº¢å‡º
+    can_parameter.trans_fifo_order = DISABLE;         // å‘é€FIFOä¸æŒ‰é¡ºåº
+    can_parameter.working_mode = CAN_NORMAL_MODE;     // æ­£å¸¸å·¥ä½œæ¨¡å¼
+    can_parameter.resync_jump_width = CAN_BT_SJW_1TQ; // é‡æ–°åŒæ­¥è·³è½¬å®½åº¦
+    can_parameter.time_segment_1 = CAN_BT_BS1_7TQ;    // æ—¶é—´æ®µ1
+    can_parameter.time_segment_2 = CAN_BT_BS2_2TQ;    // æ—¶é—´æ®µ2
 
-    /* ÉèÖÃ²¨ÌØÂÊ */
+    /* è®¾ç½®æ³¢ç‰¹ç‡ */
 #if CAN_BAUDRATE == 1000
     can_parameter.prescaler = 6; // 1MBps
 #elif CAN_BAUDRATE == 500
@@ -143,27 +209,46 @@ void can_config()
 #error "please select list can baudrate in private defines in main.c "
 #endif
 
-    /* ³õÊ¼»¯CAN */
-    can_init(CAN0, &can_parameter);
-    /* ÉèÖÃCAN¹ıÂËÆ÷²ÎÊı */
-    can_filter.filter_number = 0;                  // ÉèÖÃ¹ıÂËÆ÷±àºÅ£¬ÕâÀïÊÇ¹ıÂËÆ÷0
-    can_filter.filter_mode = CAN_FILTERMODE_MASK;  // ÉèÖÃ¹ıÂËÆ÷Ä£Ê½ÎªÆÁ±ÎÄ£Ê½
-    can_filter.filter_bits = CAN_FILTERBITS_32BIT; // ÉèÖÃ¹ıÂËÆ÷Î»¿íÎª32Î»
-    can_filter.filter_list_high = 0x0000;          // ¸ß16Î»¹ıÂËÆ÷ÁĞ±íÉèÖÃÎª0
-    can_filter.filter_list_low = 0x0000;           // µÍ16Î»¹ıÂËÆ÷ÁĞ±íÉèÖÃÎª0
-    can_filter.filter_mask_high = 0x0000;          // ¸ß16Î»¹ıÂËÆ÷ÑÚÂëÉèÖÃÎª0
-    can_filter.filter_mask_low = 0x0000;           // µÍ16Î»¹ıÂËÆ÷ÑÚÂëÉèÖÃÎª0
-    can_filter.filter_fifo_number = CAN_FIFO0;     // ÉèÖÃ¹ıÂËÆ÷µÄFIFOÎªFIFO0
-    can_filter.filter_enable = ENABLE;             // Ê¹ÄÜ¹ıÂËÆ÷
+    /* åˆå§‹åŒ–CAN */
+    can_init(CAN0, &can_parameter);   
 
-    can_filter_init(&can_filter); // ³õÊ¼»¯CAN¹ıÂËÆ÷
+    init_can0_filter(); 
 
-    can_interrupt_enable(CAN0, CAN_INT_RFNE0); // Ê¹ÄÜCAN0µÄ½ÓÊÕFIFO0·Ç¿ÕÖĞ¶Ï
+    can_interrupt_enable(CAN0, CAN_INT_RFNE0); // ä½¿èƒ½CAN0çš„æ¥æ”¶FIFO0éç©ºä¸­æ–­
 
     printf("\r\nconfigure can success !\r\n");
 }
 
-/*!
+void init_can0_filter(void)
+{
+    can_struct_para_init(CAN_FILTER_STRUCT, &can_filter); // åˆå§‹åŒ–CANæ»¤æ³¢å™¨å‚æ•°ç»“æ„ä½“
+    /* è®¾ç½®CANè¿‡æ»¤å™¨å‚æ•° */
+    can_filter.filter_number = 0;                  // è®¾ç½®è¿‡æ»¤å™¨ç¼–å·ï¼Œè¿™é‡Œæ˜¯è¿‡æ»¤å™¨0
+    can_filter.filter_mode = CAN_FILTERMODE_MASK;  // è®¾ç½®è¿‡æ»¤å™¨æ¨¡å¼ä¸ºå±è”½æ¨¡å¼
+    can_filter.filter_bits = CAN_FILTERBITS_32BIT; // è®¾ç½®è¿‡æ»¤å™¨ä½å®½ä¸º32ä½
+    can_filter.filter_list_high = 0x0000;          // é«˜16ä½è¿‡æ»¤å™¨åˆ—è¡¨è®¾ç½®ä¸º0
+    can_filter.filter_list_low = 0x0000;           // ä½16ä½è¿‡æ»¤å™¨åˆ—è¡¨è®¾ç½®ä¸º0
+    can_filter.filter_mask_high = 0x0000;          // é«˜16ä½è¿‡æ»¤å™¨æ©ç è®¾ç½®ä¸º0
+    can_filter.filter_mask_low = 0x0000;           // ä½16ä½è¿‡æ»¤å™¨æ©ç è®¾ç½®ä¸º0
+    can_filter.filter_fifo_number = CAN_FIFO0;     // è®¾ç½®è¿‡æ»¤å™¨çš„FIFOä¸ºFIFO0
+    can_filter.filter_enable = ENABLE;             // ä½¿èƒ½è¿‡æ»¤å™¨
+
+    can_filter_init(&can_filter); // åˆå§‹åŒ–CANè¿‡æ»¤å™¨
+
+    printf("\r\n init can0 filter success !\r\n");
+}
+
+void config_can0_filter(uint16_t filter_id)
+{
+    can_filter.filter_list_high = 0x0000;   // è¿‡æ»¤å™¨åˆ—è¡¨é«˜ä½ä¸ºç©º
+    can_filter.filter_list_low = filter_id; // è¿‡æ»¤å™¨åˆ—è¡¨ä½ä½ä¸º0x01
+    can_filter.filter_mask_high = 0x0000;   // æ©ç é«˜ä½ä¸º0
+    can_filter.filter_mask_low = 0xFF00;    // æ©ç ä½ä½ä¸º0xFF00ï¼Œè¡¨ç¤ºåªåŒ¹é…IDä½8ä½
+
+    printf("\r\n config filter id : %02x  !\r\n", can_filter.filter_list_low);
+}
+/*
+!
     \brief      configure the nested vectored interrupt controller
     \param[in]  none
     \param[out] none
@@ -171,9 +256,13 @@ void can_config()
 */
 void nvic_config(void)
 {
-    /* configure CAN0 NVIC */
-    nvic_irq_enable(CAN0_RX0_IRQn, 0, 0);
-    printf("\r\nconfigure CAN0 NVIC success !\r\n");
+    /* é…ç½®CAN0 NVIC */
+    nvic_irq_enable(USBD_LP_CAN0_RX0_IRQn, 0, 0);
+    printf("\r\nCAN0 NVIC config success !\r\n");
+
+    /* é…ç½®å®šæ—¶å™¨3 NVIC */
+    nvic_irq_enable(TIMER3_IRQn, 1, 0);
+    printf("\r\ntimer3 NVIC config success !\r\n");
 }
 
 void led_on(LED_e led)
@@ -200,15 +289,25 @@ void led_off(LED_e led)
     }
 }
 
+void led_twinkle(LED_e led)
+{
+    for (uint8_t i = 0; i < 4; i++)
+    {
+        led_on(led);
+        accurate_delay_ms(200);
+        led_off(led);
+    }
+}
+
 void led_init(void)
 {
 
     rcu_periph_clock_enable(RCU_GPIOB);
-    /* ³õÊ¼»¯ÂÌÉ«led*/
+    /* åˆå§‹åŒ–ç»¿è‰²led*/
     gpio_init(GPIOB, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_10);
     led_off(e_green_led);
 
-    /* ³õÊ¼»¯ºìÉ«led*/
+    /* åˆå§‹åŒ–çº¢è‰²led*/
     gpio_init(GPIOB, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_11);
     led_off(e_red_led);
 
@@ -217,22 +316,20 @@ void led_init(void)
 
 /**
 
-@brief CANÄ£¿éµÄGPIOÒı½ÅÅäÖÃº¯Êı
+@brief CANæ¨¡å—çš„GPIOå¼•è„šé…ç½®å‡½æ•°
 **/
 void can_gpio_config(void)
 {
-    /*Ê¹ÄÜCANÄ£¿éÊ±ÖÓ*/
-    rcu_periph_clock_enable(RCU_CAN0);  // Ê¹ÄÜCAN0ÍâÉèÊ±ÖÓ¡£
-    rcu_periph_clock_enable(RCU_GPIOD); // Ê¹ÄÜGPIOD¶Ë¿ÚÊ±ÖÓ¡£
-    rcu_periph_clock_enable(RCU_AF);    // Ê¹ÄÜ¸´ÓÃ¹¦ÄÜÄ£¿éµÄÊ±ÖÓ¡£
+    /* ä½¿èƒ½CAN0å’ŒGPIOBæ—¶é’Ÿ */
+    rcu_periph_clock_enable(RCU_CAN0);  
+    rcu_periph_clock_enable(RCU_GPIOB); 
 
-    /* ÅäÖÃCAN0µÄGPIOÒı½Å */
-    gpio_init(GPIOD, GPIO_MODE_IPU, GPIO_OSPEED_50MHZ, GPIO_PIN_0);   // ÅäÖÃPD0ÎªÉÏÀ­ÊäÈëÄ£Ê½
-    gpio_init(GPIOD, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_1); // ÅäÖÃPD1Îª¸´ÓÃ¹¦ÄÜÍÆÍìÊä³öÄ£Ê½
-    gpio_pin_remap_config(GPIO_CAN0_FULL_REMAP, ENABLE);              // ÖØÓ³ÉäCAN0µÄGPIOÒı½ÅÎªPD0ºÍPD1
+    /* é…ç½®PB8å’ŒPB9ä¸ºCAN0çš„RXå’ŒTXå¼•è„š */
+    gpio_init(GPIOB, GPIO_MODE_IPU, GPIO_OSPEED_50MHZ, GPIO_PIN_8);  // RX
+    gpio_init(GPIOB, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_9); // TX
 }
 
-/* ÖØÓ³Éä´òÓ¡º¯Êıµ½´®¿Ú0 */
+/* é‡æ˜ å°„æ‰“å°å‡½æ•°åˆ°ä¸²å£0 */
 int fputc(int ch, FILE *f)
 {
     usart_data_transmit(USART0, (uint8_t)ch);
@@ -243,30 +340,126 @@ int fputc(int ch, FILE *f)
 
 /*!
 
-@brief ³õÊ¼»¯´®¿Ú0
+@brief åˆå§‹åŒ–ä¸²å£0
 
 @param none
 
 @retval none
 */
-void uart0_init()
+void uart0_init(void)
 {
-    /* Ê¹ÄÜGPIOÊ±ÖÓ */
+    /* ä½¿èƒ½GPIOæ—¶é’Ÿ */
     rcu_periph_clock_enable(RCU_GPIOA);
 
-    /* Ê¹ÄÜUSARTÊ±ÖÓ */
+    /* ä½¿èƒ½USARTæ—¶é’Ÿ */
     rcu_periph_clock_enable(RCU_USART0);
 
-    /*³õÊ¼»¯·¢ËÍ¹Ü½Å */
+    /*åˆå§‹åŒ–å‘é€ç®¡è„š */
     gpio_init(GPIOA, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_9);
 
-    /* ³õÊ¼»¯½ÓÊÕ¹Ü½Å */
+    /* åˆå§‹åŒ–æ¥æ”¶ç®¡è„š */
     gpio_init(GPIOA, GPIO_MODE_IN_FLOATING, GPIO_OSPEED_50MHZ, GPIO_PIN_10);
 
-    /* USART ÅäÖÃ */
-    usart_deinit(USART0);                                 // ½« USART0 ÍâÉèµÄ¼Ä´æÆ÷»Ö¸´µ½¸´Î»Öµ£¬È·±£ÍâÉèÒÔ×î³õµÄ×´Ì¬¿ªÊ¼ÅäÖÃ¡£
-    usart_baudrate_set(USART0, 115200U);                  // ÉèÖÃ USART0 µÄ²¨ÌØÂÊÎª 115200¡£
-    usart_receive_config(USART0, USART_RECEIVE_ENABLE);   // Ê¹ÄÜ USART0 µÄ½ÓÊÕ¹¦ÄÜ¡£
-    usart_transmit_config(USART0, USART_TRANSMIT_ENABLE); // Ê¹ÄÜ USART0 µÄ·¢ËÍ¹¦ÄÜ¡£
-    usart_enable(USART0);                                 // Ê¹ÄÜ USART0 ÍâÉè¡£
+    /* USART é…ç½® */
+    usart_deinit(USART0);                                 // å°† USART0 å¤–è®¾çš„å¯„å­˜å™¨æ¢å¤åˆ°å¤ä½å€¼ï¼Œç¡®ä¿å¤–è®¾ä»¥æœ€åˆçš„çŠ¶æ€å¼€å§‹é…ç½®ã€‚
+    usart_baudrate_set(USART0, 115200U);                  // è®¾ç½® USART0 çš„æ³¢ç‰¹ç‡ä¸º 115200ã€‚
+    usart_receive_config(USART0, USART_RECEIVE_ENABLE);   // ä½¿èƒ½ USART0 çš„æ¥æ”¶åŠŸèƒ½ã€‚
+    usart_transmit_config(USART0, USART_TRANSMIT_ENABLE); // ä½¿èƒ½ USART0 çš„å‘é€åŠŸèƒ½ã€‚
+    usart_enable(USART0);                                 // ä½¿èƒ½ USART0 å¤–è®¾ã€‚
+}
+
+/**
+
+@brief è¯¥å‡½æ•°ä½¿ç”¨äº†å®šæ—¶å™¨2æ¥å®ç°æ¯«ç§’çº§å»¶è¿Ÿï¼ŒåŒæ—¶ä¸ä¼šå½±å“CAN0ä¸­æ–­ã€‚å‡½æ•°çš„å‚æ•°mså¯ä»¥æŒ‡å®šå»¶è¿Ÿçš„æ¯«ç§’æ•°ï¼Œæœ€å¤§å»¶è¿Ÿæ—¶é—´ä¸º6553.5æ¯«ç§’
+
+@param ms: å»¶æ—¶çš„æ¯«ç§’æ•°
+
+@retval None
+**/
+void accurate_delay_ms(uint16_t ms)
+{
+    rcu_periph_clock_enable(RCU_TIMER2); // ä½¿èƒ½å®šæ—¶å™¨ 2 æ—¶é’Ÿ
+
+    timer_parameter_struct timer_initpara;
+    timer_struct_para_init(&timer_initpara); // ä½¿ç”¨é»˜è®¤å€¼åˆå§‹åŒ–å®šæ—¶å™¨é…ç½®
+
+    timer_initpara.prescaler = SystemCoreClock / 10000 - 1; // å®šæ—¶å™¨ 2 æ—¶é’Ÿé¢‘ç‡ä¸ºç³»ç»Ÿæ—¶é’Ÿé¢‘ç‡çš„ 1/10000
+    timer_initpara.alignedmode = TIMER_COUNTER_EDGE;
+    timer_initpara.counterdirection = TIMER_COUNTER_UP;
+    timer_initpara.period = ms * 10;     // å®šæ—¶å™¨ 2 çš„å‘¨æœŸä¸ºéœ€è¦å»¶æ—¶çš„æ¯«ç§’æ•°ä¹˜ä»¥ 10ï¼ˆå› ä¸ºæ—¶é’Ÿé¢‘ç‡ä¸º 1/10000ï¼‰
+    timer_init(TIMER2, &timer_initpara); // åˆå§‹åŒ–å®šæ—¶å™¨ 2
+
+    timer_flag_clear(TIMER2, TIMER_FLAG_UP); // æ¸…é™¤å®šæ—¶å™¨ 2 çš„è®¡æ•°æ ‡å¿—ä½
+    timer_enable(TIMER2);                    // å¯åŠ¨å®šæ—¶å™¨ 2
+
+    while (!timer_flag_get(TIMER2, TIMER_FLAG_UP))
+    {
+    } // ç­‰å¾…å®šæ—¶å™¨ 2 è®¡æ•°åˆ° 0
+
+    timer_disable(TIMER2);                // åœæ­¢å®šæ—¶å™¨ 2
+    rcu_periph_clock_disable(RCU_TIMER2); // å…³é—­å®šæ—¶å™¨ 2 æ—¶é’Ÿ
+}
+
+/*!
+\brief CAN0æ¥æ”¶ä¸­æ–­å‡½æ•°
+\param[in] æ— 
+\param[out] æ— 
+\retval æ— 
+*/
+
+void USBD_LP_CAN0_RX0_IRQHandler(void)
+{
+    can_message_receive(CAN0, CAN_FIFO0, &receive_message); // è¯»å–CAN0çš„æ¥æ”¶ç¼“å­˜FIFO0ä¸­çš„æ¶ˆæ¯åˆ°ç»“æ„ä½“receive_messageä¸­
+
+    led_twinkle(e_green_led); // ç»¿è‰²æŒ‡ç¤ºç¯é—ªçƒ
+
+    ckeck_receive_data();//åˆ¤æ–­æ˜¯å¦ç¬¦åˆé€šä¿¡åè®®
+
+    printf("\r\nrx [%02x]: ", receive_message.rx_sfid);
+    for (uint8_t i = 0; i < receive_message.rx_dlen; i++) // éå†å‘é€æ•°æ®
+    {
+        printf("%02x ", receive_message.rx_data[i]); // æ‰“å°æ¯ä¸€ä¸ªæ•°æ®
+    }
+    printf("\r\n"); // æ¢è¡Œ
+}
+
+void init_communication_id(void)
+{
+    for (uint8_t i = 0; i < SLAVE_COUNT; i++)
+    {
+        communication_id[i].slave_tx_id = SLAVE_TX_ID_START + i;
+        communication_id[i].slave_rx_id = SLAVE_RX_ID_START + i;
+        communication_id[i].master_tx_id = MASTER_TX_ID_START + i;
+        communication_id[i].master_rx_id = MASTER_RX_ID_START + i;
+    }
+}
+
+void TIMER3_IRQHandler(void)
+{
+    if (timer_flag_get(TIMER3, TIMER_FLAG_UP) == SET)
+    {
+        timer_flag_clear(TIMER3, TIMER_FLAG_UP);
+        master_task(g_slave_index); // æ¯5ç§’è°ƒç”¨ä¸€æ¬¡å‘¨æœŸä»»åŠ¡
+    }
+}
+
+void timer3_init(uint32_t period)
+{
+    /* ä½¿èƒ½å®šæ—¶å™¨3æ—¶é’Ÿ */
+    rcu_periph_clock_enable(RCU_TIMER3);
+
+    /* å®šæ—¶å™¨3çš„åŸºæœ¬é…ç½® */
+    timer_parameter_struct timer_initpara;
+    timer_struct_para_init(&timer_initpara);
+    timer_initpara.prescaler = SystemCoreClock / 10000 - 1;
+    timer_initpara.alignedmode = TIMER_COUNTER_EDGE;
+    timer_initpara.counterdirection = TIMER_COUNTER_UP;
+    timer_initpara.period = period * 10;  // æ¯periodæ¯«ç§’è§¦å‘ä¸€æ¬¡ä¸­æ–­
+    timer_init(TIMER3, &timer_initpara);
+
+    /* ä½¿èƒ½å®šæ—¶å™¨3ä¸­æ–­ */
+    timer_interrupt_enable(TIMER3, TIMER_INT_UP);
+
+    /* å¯åŠ¨å®šæ—¶å™¨3 */
+    timer_enable(TIMER3);
 }

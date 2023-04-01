@@ -69,27 +69,28 @@ void can_deinit(uint32_t can_periph)
 }
 
 /*!
-    \brief      initialize CAN parameter struct with a default value
-    \param[in]  type: the type of CAN parameter struct
-                only one parameter can be selected which is shown as below:
-      \arg        CAN_INIT_STRUCT: the CAN initial struct
-      \arg        CAN_FILTER_STRUCT: the CAN filter struct
-      \arg        CAN_TX_MESSAGE_STRUCT: the CAN TX message struct
-      \arg        CAN_RX_MESSAGE_STRUCT: the CAN RX message struct
-    \param[out] p_struct: the pointer of the specific struct
-    \retval     none
-*/
+ * @brief 将 CAN 参数结构体初始化为默认值
+ * @param[in] type: CAN 参数结构体的类型，仅支持以下四种类型：
+ *      \arg CAN_INIT_STRUCT: CAN 初始化结构体
+ *      \arg CAN_FILTER_STRUCT: CAN 滤波器结构体
+ *      \arg CAN_TX_MESSAGE_STRUCT: CAN 发送消息结构体
+ *      \arg CAN_RX_MESSAGE_STRUCT: CAN 接收消息结构体
+ * @param[out] p_struct: 指向特定结构体的指针
+ * @retval 无
+ */
 void can_struct_para_init(can_struct_type_enum type, void *p_struct)
 {
     uint8_t i;
-
-    if(NULL == p_struct) {
+    // 检查结构体指针是否为空
+    if (NULL == p_struct)
+    {
         CAN_ERROR_HANDLE("struct parameter can not be NULL \r\n");
     }
 
-    /* get type of the struct */
-    switch(type) {
-    /* used for can_init() */
+    // 根据类型初始化不同的结构体
+    switch (type)
+    {
+        /*  用于 can_init() 函数 */
     case CAN_INIT_STRUCT:
         ((can_parameter_struct *)p_struct)->auto_bus_off_recovery = DISABLE;
         ((can_parameter_struct *)p_struct)->auto_retrans = DISABLE;
@@ -104,7 +105,7 @@ void can_struct_para_init(can_struct_type_enum type, void *p_struct)
         ((can_parameter_struct *)p_struct)->working_mode = CAN_NORMAL_MODE;
 
         break;
-    /* used for can_filter_init() */
+        /* 用于 can_filter_init() 函数 */
     case CAN_FILTER_STRUCT:
         ((can_filter_parameter_struct *)p_struct)->filter_bits = CAN_FILTERBITS_32BIT;
         ((can_filter_parameter_struct *)p_struct)->filter_enable = DISABLE;
@@ -117,9 +118,10 @@ void can_struct_para_init(can_struct_type_enum type, void *p_struct)
         ((can_filter_parameter_struct *)p_struct)->filter_number = 0U;
 
         break;
-    /* used for can_message_transmit() */
+    /* 用于 can_message_transmit() 函数 */
     case CAN_TX_MESSAGE_STRUCT:
-        for(i = 0U; i < 8U; i++) {
+        for (i = 0U; i < 8U; i++)
+        {
             ((can_trasnmit_message_struct *)p_struct)->tx_data[i] = 0U;
         }
 
@@ -130,9 +132,10 @@ void can_struct_para_init(can_struct_type_enum type, void *p_struct)
         ((can_trasnmit_message_struct *)p_struct)->tx_sfid = 0U;
 
         break;
-    /* used for can_message_receive() */
+    /* 用于 for can_message_receive() 函数*/
     case CAN_RX_MESSAGE_STRUCT:
-        for(i = 0U; i < 8U; i++) {
+        for (i = 0U; i < 8U; i++)
+        {
             ((can_receive_message_struct *)p_struct)->rx_data[i] = 0U;
         }
 
@@ -579,30 +582,28 @@ void can_transmission_stop(uint32_t can_periph, uint8_t mailbox_number)
     }
 }
 
-/*!
-    \brief      CAN receive message
-    \param[in]  can_periph
-      \arg        CANx(x=0,1),the CAN1 only for GD32F30X_CL
-    \param[in]  fifo_number
-      \arg        CAN_FIFOx(x=0,1)
-    \param[out] receive_message: struct for CAN receive message
-      \arg        rx_sfid: 0x00000000 - 0x000007FF
-      \arg        rx_efid: 0x00000000 - 0x1FFFFFFF
-      \arg        rx_ff: CAN_FF_STANDARD, CAN_FF_EXTENDED
-      \arg        rx_ft: CAN_FT_DATA, CAN_FT_REMOTE
-      \arg        rx_dlen: 0 - 8
-      \arg        rx_data[]: 0x00 - 0xFF
-      \arg        rx_fi: 0 - 27
-    \retval     none
+/*
+函数名：can_message_receive
+参数：
+can_periph: CAN外设，如CAN1、CAN2等。
+fifo_number: 需要接收的FIFO编号，为0或1。
+receive_message: 存储接收到的CAN帧的结构体指针。
+功能：
+从CAN接收FIFO中获取一帧CAN帧，并将其解析到receive_message指向的结构体中。
+receive_message结构体包含了CAN帧的所有信息，包括帧格式、帧类型、过滤器索引、
+标准/扩展帧ID、数据长度和数据等。
 */
 void can_message_receive(uint32_t can_periph, uint8_t fifo_number, can_receive_message_struct *receive_message)
 {
     /* get the frame format */
     receive_message->rx_ff = (uint8_t)(CAN_RFIFOMI_FF & CAN_RFIFOMI(can_periph, fifo_number));
-    if(CAN_FF_STANDARD == receive_message->rx_ff) {
+    if (CAN_FF_STANDARD == receive_message->rx_ff)
+    {
         /* get standard identifier */
         receive_message->rx_sfid = (uint32_t)(GET_RFIFOMI_SFID(CAN_RFIFOMI(can_periph, fifo_number)));
-    } else {
+    }
+    else
+    {
         /* get extended identifier */
         receive_message->rx_efid = (uint32_t)(GET_RFIFOMI_EFID(CAN_RFIFOMI(can_periph, fifo_number)));
     }
@@ -615,19 +616,22 @@ void can_message_receive(uint32_t can_periph, uint8_t fifo_number, can_receive_m
     receive_message->rx_dlen = (uint8_t)(GET_RFIFOMP_DLENC(CAN_RFIFOMP(can_periph, fifo_number)));
 
     /* receive data */
-    receive_message -> rx_data[0] = (uint8_t)(GET_RFIFOMDATA0_DB0(CAN_RFIFOMDATA0(can_periph, fifo_number)));
-    receive_message -> rx_data[1] = (uint8_t)(GET_RFIFOMDATA0_DB1(CAN_RFIFOMDATA0(can_periph, fifo_number)));
-    receive_message -> rx_data[2] = (uint8_t)(GET_RFIFOMDATA0_DB2(CAN_RFIFOMDATA0(can_periph, fifo_number)));
-    receive_message -> rx_data[3] = (uint8_t)(GET_RFIFOMDATA0_DB3(CAN_RFIFOMDATA0(can_periph, fifo_number)));
-    receive_message -> rx_data[4] = (uint8_t)(GET_RFIFOMDATA1_DB4(CAN_RFIFOMDATA1(can_periph, fifo_number)));
-    receive_message -> rx_data[5] = (uint8_t)(GET_RFIFOMDATA1_DB5(CAN_RFIFOMDATA1(can_periph, fifo_number)));
-    receive_message -> rx_data[6] = (uint8_t)(GET_RFIFOMDATA1_DB6(CAN_RFIFOMDATA1(can_periph, fifo_number)));
-    receive_message -> rx_data[7] = (uint8_t)(GET_RFIFOMDATA1_DB7(CAN_RFIFOMDATA1(can_periph, fifo_number)));
+    receive_message->rx_data[0] = (uint8_t)(GET_RFIFOMDATA0_DB0(CAN_RFIFOMDATA0(can_periph, fifo_number)));
+    receive_message->rx_data[1] = (uint8_t)(GET_RFIFOMDATA0_DB1(CAN_RFIFOMDATA0(can_periph, fifo_number)));
+    receive_message->rx_data[2] = (uint8_t)(GET_RFIFOMDATA0_DB2(CAN_RFIFOMDATA0(can_periph, fifo_number)));
+    receive_message->rx_data[3] = (uint8_t)(GET_RFIFOMDATA0_DB3(CAN_RFIFOMDATA0(can_periph, fifo_number)));
+    receive_message->rx_data[4] = (uint8_t)(GET_RFIFOMDATA1_DB4(CAN_RFIFOMDATA1(can_periph, fifo_number)));
+    receive_message->rx_data[5] = (uint8_t)(GET_RFIFOMDATA1_DB5(CAN_RFIFOMDATA1(can_periph, fifo_number)));
+    receive_message->rx_data[6] = (uint8_t)(GET_RFIFOMDATA1_DB6(CAN_RFIFOMDATA1(can_periph, fifo_number)));
+    receive_message->rx_data[7] = (uint8_t)(GET_RFIFOMDATA1_DB7(CAN_RFIFOMDATA1(can_periph, fifo_number)));
 
     /* release FIFO */
-    if(CAN_FIFO0 == fifo_number) {
+    if (CAN_FIFO0 == fifo_number)
+    {
         CAN_RFIFO0(can_periph) |= CAN_RFIFO0_RFD0;
-    } else {
+    }
+    else
+    {
         CAN_RFIFO1(can_periph) |= CAN_RFIFO1_RFD1;
     }
 }
