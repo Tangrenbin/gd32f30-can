@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "main.h"
 #include "gd32f30x_gpio.h"
+#include "string.h"
 
 /* ½ÇÉ« */
 #define ROLE (e_master)

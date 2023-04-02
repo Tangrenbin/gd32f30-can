@@ -27,7 +27,7 @@
 ".\output\gd32f30x_timer.o"
 ".\output\gd32f30x_usart.o"
 ".\output\gd32f30x_wwdgt.o"
-".\output\startup_gd32f30x_cl.o"
+".\output\startup_gd32f30x_hd.o"
 ".\output\gd32f307c_eval.o"
 --library_type=microlib --strict --scatter ".\output\Project.sct"
 --summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
