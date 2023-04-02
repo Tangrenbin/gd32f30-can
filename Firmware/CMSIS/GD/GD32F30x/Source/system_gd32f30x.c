@@ -37,7 +37,7 @@
 /* system frequency define */
 #define __IRC8M           (IRC8M_VALUE)            /* internal 8 MHz RC oscillator frequency */
 #define __HXTAL           (HXTAL_VALUE)            /* high speed crystal oscillator frequency */
-#define __SYS_OSC_CLK     (__IRC8M)                /* main oscillator frequency */
+#define __SYS_OSC_CLK     (__HXTAL)                /* main oscillator frequency */
 
 /* select a system clock by uncommenting the following line */
 /* use IRC8M */
@@ -855,9 +855,9 @@ static void system_clock_120m_hxtal(void)
     RCU_CFG0 &= ~(RCU_CFG0_PLLSEL | RCU_CFG0_PREDV0);
     RCU_CFG0 |= (RCU_PLLSRC_HXTAL_IRC48M | RCU_CFG0_PREDV0);
 
-    /* CK_PLL = (CK_HXTAL/2) * 30 = 120 MHz */
+    /* CK_PLL = (12/2) * 20 = 120 MHz */
     RCU_CFG0 &= ~(RCU_CFG0_PLLMF | RCU_CFG0_PLLMF_4 | RCU_CFG0_PLLMF_5);
-    RCU_CFG0 |= RCU_PLL_MUL30;
+    RCU_CFG0 |= RCU_PLL_MUL20;
 
 #elif defined(GD32F30X_CL)
     /* CK_PLL = (CK_PREDIV0) * 30 = 120 MHz */ 

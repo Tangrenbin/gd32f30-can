@@ -4,16 +4,16 @@
 
 #define __PACKED		__attribute__ ((__packed__))
 
-/* å‘é€æ•°æ®å†…å®¹ */
+/* ·¢ËÍÊı¾İÄÚÈİ */
 #define SEND_DATA (0x11)
 
-/*ä»èŠ‚ç‚¹æ•°é‡*/
+/*´Ó½ÚµãÊıÁ¿*/
 #define SLAVE_CONUT (31)
 
-/* é€šä¿¡è¶…æ—¶æ—¶é—´ï¼š5ms */
+/* Í¨ĞÅ³¬Ê±Ê±¼ä£º5ms */
 #define COMMUNICATION_TIMEOUT (0x05)
 
-/* é€šä¿¡é€Ÿç‡ï¼š1MBps */
+/* Í¨ĞÅËÙÂÊ£º1MBps */
 #define CAN_BAUDRATE (1000)
 /* 500kBps */
 /* #define CAN_BAUDRATE  500 */
@@ -31,7 +31,7 @@
 /* led spark function */
 /* void led_spark(void); */
 
-/* ä»èŠ‚ç‚¹æ•°é‡ */
+/* ´Ó½ÚµãÊıÁ¿ */
 #define SLAVE_COUNT (32)
 #define MASTER_TX_ID_START (0x51)
 #define SLAVE_RX_ID_START (0x01)
@@ -40,10 +40,10 @@
 
 typedef struct
 {
-    uint8_t slave_tx_id;
-    uint8_t slave_rx_id;
-    uint8_t master_tx_id;
-    uint8_t master_rx_id;
+    uint8_t slave_tx_id;//´Ó½ÚµãµÄ·¢ËÍID
+    uint8_t slave_rx_id;//´Ó½ÚµãµÄ¹ıÂËÆ÷ID
+    uint8_t master_tx_id;//Ö÷½ÚµãµÄ·¢ËÍID
+    uint8_t master_rx_id;//Ö÷½ÚµãµÄ¹ıÂËÆ÷ID
 
 } __PACKED COMMUNICATION_ID_t;
 

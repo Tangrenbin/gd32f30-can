@@ -3,55 +3,57 @@
 #include "main.h"
 #include "gd32f30x_gpio.h"
 
-/* è§’è‰² */
+/* ½ÇÉ« */
 #define ROLE (e_master)
 // #define ROLE (e_slave_0)
-/* CANå‘é€å‚æ•° */
+/* CAN·¢ËÍ²ÎÊı */
 can_trasnmit_message_struct transmit_message;
-/* CANæ¥æ”¶å‚æ•° */
+/* CAN½ÓÊÕ²ÎÊı */
 can_receive_message_struct receive_message;
-/* CANæ»¤æ³¢å™¨å‚æ•° */
+/* CANÂË²¨Æ÷²ÎÊı */
 can_filter_parameter_struct can_filter;
-/* é€šä¿¡ID */
+/* Í¨ĞÅID */
 COMMUNICATION_ID_t communication_id[SLAVE_COUNT];
 
-/* ç¡®è®¤å¸§æ ¼å¼ */
+/* È·ÈÏÖ¡¸ñÊ½ */
 const uint8_t sack_frame [8] = {0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
-/* æ•°æ®å¸§æ ¼å¼ */
+/* Êı¾İÖ¡¸ñÊ½ */
 const uint8_t data_frame [8] = {0x11,0x11,0x11,0x11,0x11,0x11,0x11,0x11};
-/* ä»èŠ‚ç‚¹åºå· */
+/* ´Ó½ÚµãĞòºÅ */
 uint8_t g_slave_index = 0;
+/* Ö÷½Úµã»Ø¸´È·ÈÏÖ¡±êÖ¾ */
+uint8_t g_master_ack_flag = RESET;
 
 int main(void)
 {
-    /* é…ç½®GPIOå¼•è„š */
+    /* ÅäÖÃGPIOÒı½Å */
     can_gpio_config();
 
-    /* åˆå§‹åŒ–canæ¥æ”¶å‚æ•° */
+    /* ³õÊ¼»¯can½ÓÊÕ²ÎÊı */
     can_struct_para_init(CAN_RX_MESSAGE_STRUCT, &receive_message);
 
-    /* åˆå§‹åŒ–canå‘é€å‚æ•°  */
+    /* ³õÊ¼»¯can·¢ËÍ²ÎÊı  */
     can_struct_para_init(CAN_TX_MESSAGE_STRUCT, &transmit_message);
 
-    /* é…ç½®ä¸­æ–­å‘é‡è¡¨ */
+    /* ÅäÖÃÖĞ¶ÏÏòÁ¿±í */
     nvic_config();
 
-    /* åˆå§‹åŒ–ä¸²å£0 */
+    /* ³õÊ¼»¯´®¿Ú0 */
     uart0_init();
 
-    /* åˆå§‹åŒ–LED */
+    /* ³õÊ¼»¯LED */
     led_init();
 
-    /* åˆå§‹åŒ–CANå’Œè¿‡æ»¤å™¨ */
+    /* ³õÊ¼»¯CANºÍ¹ıÂËÆ÷ */
     can_config();
     
-    /* åˆå§‹åŒ–é€šä¿¡id */
+    /* ³õÊ¼»¯Í¨ĞÅid */
     init_communication_id();
 
     if (ROLE == e_master)
     {
-        /* é…ç½®å®šæ—¶å™¨3 */
-        timer3_init(5000); // å®šæ—¶å™¨3æ¯5000ï¼ˆ5ç§’ï¼‰ä¸ªè®¡æ•°å‘¨æœŸäº§ç”Ÿä¸€æ¬¡ä¸­æ–­è¿›è¡Œä¸»èŠ‚ç‚¹å‘¨æœŸå‘é€ä»»åŠ¡
+        /* ÅäÖÃ¶¨Ê±Æ÷3 */
+        timer3_init(5000); // ¶¨Ê±Æ÷3Ã¿5000£¨5Ãë£©¸ö¼ÆÊıÖÜÆÚ²úÉúÒ»´ÎÖĞ¶Ï½øĞĞÖ÷½ÚµãÖÜÆÚ·¢ËÍÈÎÎñ
     }
     else
     {
@@ -66,31 +68,31 @@ int main(void)
 
 /**
 
-@brief ä¸»ä»»åŠ¡å‡½æ•°ï¼Œå‘æŒ‡å®šä»èŠ‚ç‚¹å‘é€æ•°æ®å¹¶é…ç½®CANè¿‡æ»¤å™¨
+@brief Ö÷ÈÎÎñº¯Êı£¬ÏòÖ¸¶¨´Ó½Úµã·¢ËÍÊı¾İ²¢ÅäÖÃCAN¹ıÂËÆ÷
 
-@param[in] slave_index æŒ‡å®šä»èŠ‚ç‚¹çš„ç´¢å¼•
+@param[in] slave_index Ö¸¶¨´Ó½ÚµãµÄË÷Òı
 
-@note æ•°æ®å‘é€æ ‡è¯†ç¬¦ä¸ºæŒ‡å®šä»èŠ‚ç‚¹çš„ä¸»æ”¶æ ‡è¯†ç¬¦ï¼Œæ•°æ®å†…å®¹ä¸ºå›ºå®šçš„11 11 11 11 11 11 11 11
+@note Êı¾İ·¢ËÍ±êÊ¶·ûÎªÖ¸¶¨´Ó½ÚµãµÄÖ÷ÊÕ±êÊ¶·û£¬Êı¾İÄÚÈİÎª¹Ì¶¨µÄ11 11 11 11 11 11 11 11
 
-@note æ•°æ®å‘é€åä¼šæ”¶åˆ°ä»èŠ‚ç‚¹çš„ç¡®è®¤å¸§ï¼Œä¸»èŠ‚ç‚¹éœ€è¦å›å¤ç¡®è®¤å¸§
+@note Êı¾İ·¢ËÍºó»áÊÕµ½´Ó½ÚµãµÄÈ·ÈÏÖ¡£¬Ö÷½ÚµãĞèÒª»Ø¸´È·ÈÏÖ¡
 
-@note ç¡®è®¤å¸§æ•°æ®å†…å®¹æ ¼å¼å›ºå®šä¸ºï¼šFF FF FF FF FF FF FF FFï¼Œé•¿åº¦å›ºå®šä¸º8ä¸ªå­—èŠ‚
+@note È·ÈÏÖ¡Êı¾İÄÚÈİ¸ñÊ½¹Ì¶¨Îª£ºFF FF FF FF FF FF FF FF£¬³¤¶È¹Ì¶¨Îª8¸ö×Ö½Ú
 
-@note ä¸»èŠ‚ç‚¹ç¯è¯­ï¼šæ¥æ”¶æ•°æ®æ—¶é—ªçƒç»¿è‰²LEDï¼Œå‘é€æ•°æ®æ—¶é—ªçƒçº¢è‰²LED
+@note Ö÷½ÚµãµÆÓï£º½ÓÊÕÊı¾İÊ±ÉÁË¸ÂÌÉ«LED£¬·¢ËÍÊı¾İÊ±ÉÁË¸ºìÉ«LED
 
-@note ä¸»èŠ‚ç‚¹å‘é€æ•°æ®åä¼šé…ç½®CANè¿‡æ»¤å™¨ä»¥æ¥æ”¶ä»èŠ‚ç‚¹çš„ç¡®è®¤å¸§
+@note Ö÷½Úµã·¢ËÍÊı¾İºó»áÅäÖÃCAN¹ıÂËÆ÷ÒÔ½ÓÊÕ´Ó½ÚµãµÄÈ·ÈÏÖ¡
 
-@note ä¸»èŠ‚ç‚¹ä¼šæŒ‰ç…§ä»èŠ‚ç‚¹çš„ç´¢å¼•ä¾æ¬¡å‘é€æ•°æ®ï¼Œå½“ç´¢å¼•è¾¾åˆ°æœ€å¤§å€¼æ—¶é‡æ–°ä»0å¼€å§‹å¾ªç¯
+@note Ö÷½Úµã»á°´ÕÕ´Ó½ÚµãµÄË÷ÒıÒÀ´Î·¢ËÍÊı¾İ£¬µ±Ë÷Òı´ïµ½×î´óÖµÊ±ÖØĞÂ´Ó0¿ªÊ¼Ñ­»·
 */
 void master_task(const uint8_t slave_index)
 {
-    // å‘æŒ‡å®šä»èŠ‚ç‚¹å‘é€æ•°æ®
+    // ÏòÖ¸¶¨´Ó½Úµã·¢ËÍÊı¾İ
     can_send_data(SEND_DATA, communication_id[slave_index].master_tx_id);
 
-    // é…ç½®CANè¿‡æ»¤å™¨ä»¥æ¥æ”¶ä»èŠ‚ç‚¹çš„ç¡®è®¤å¸§
-    config_can0_filter(communication_id[slave_index].slave_rx_id);
+    // ÅäÖÃCAN¹ıÂËÆ÷ÒÔ½ÓÊÕ´Ó½ÚµãµÄÈ·ÈÏÖ¡
+    config_can0_filter(communication_id[slave_index].master_rx_id);
 
-    // æ›´æ–°ä¸‹ä¸€ä¸ªä»èŠ‚ç‚¹çš„ç´¢å¼•
+    // ¸üĞÂÏÂÒ»¸ö´Ó½ÚµãµÄË÷Òı
     g_slave_index = (slave_index + 1) % SLAVE_COUNT;
 }
 
@@ -101,7 +103,7 @@ void slave_task(const uint8_t slave_seq)
 
 void config_slave_communication_id(const uint8_t slave_seq)
 {
-    // é…ç½®CANè¿‡æ»¤å™¨ä»¥æ¥æ”¶ä¸»èŠ‚ç‚¹çš„ç¡®è®¤å¸§
+    // ÅäÖÃCAN¹ıÂËÆ÷ÒÔ½ÓÊÕÖ÷½ÚµãµÄÈ·ÈÏÖ¡
     if (slave_seq < SLAVE_COUNT)
     {
         config_can0_filter(communication_id[slave_seq].slave_rx_id);
@@ -111,25 +113,25 @@ void config_slave_communication_id(const uint8_t slave_seq)
 
 void can_send_data(const uint8_t send_data, const uint32_t tx_sfid)
 {
-    uint32_t timeout = 0xFFFF;    // åˆå§‹åŒ–å‘é€è¶…æ—¶æ—¶é—´ä¸º0xFFFF
-    uint8_t transmit_mailbox = 0; // å®šä¹‰å‘é€é‚®ç®±ç¼–å·ä¸º0
+    uint32_t timeout = 0xFFFF;    // ³õÊ¼»¯·¢ËÍ³¬Ê±Ê±¼äÎª0xFFFF
+    uint8_t transmit_mailbox = 0; // ¶¨Òå·¢ËÍÓÊÏä±àºÅÎª0
 
-    transmit_message.tx_sfid = tx_sfid;                                            // å°†å‘é€æ¶ˆæ¯çš„æ ‡å‡†å¸§IDè®¾ç½®ä¸ºtx_sfid
-    memset(transmit_message.tx_data, send_data, sizeof(transmit_message.tx_data)); // å°†å‘é€æ•°æ®çš„å†…å®¹è®¾ç½®ä¸ºsend_data
+    transmit_message.tx_sfid = tx_sfid;                                            // ½«·¢ËÍÏûÏ¢µÄ±ê×¼Ö¡IDÉèÖÃÎªtx_sfid
+    memset(transmit_message.tx_data, send_data, sizeof(transmit_message.tx_data)); // ½«·¢ËÍÊı¾İµÄÄÚÈİÉèÖÃÎªsend_data
 
-    transmit_mailbox = can_message_transmit(CAN0, &transmit_message); // å‘é€CANæ¶ˆæ¯
+    transmit_mailbox = can_message_transmit(CAN0, &transmit_message); // ·¢ËÍCANÏûÏ¢
 
     while (can_transmit_states(CAN0, transmit_mailbox) != CAN_TRANSMIT_OK && timeout--)
-        ; // ç­‰å¾…å‘é€å®Œæˆ
+        ; // µÈ´ı·¢ËÍÍê³É
 
     led_twinkle(e_red_led);
 
     printf("\r\ntx [%02x]: ",transmit_message.tx_sfid);
-    for (uint8_t i = 0; i < transmit_message.tx_dlen; i++) // éå†å‘é€æ•°æ®
+    for (uint8_t i = 0; i < transmit_message.tx_dlen; i++) // ±éÀú·¢ËÍÊı¾İ
     {
-        printf("%02x ", transmit_message.tx_data[i]); // æ‰“å°æ¯ä¸€ä¸ªæ•°æ®
+        printf("%02x ", transmit_message.tx_data[i]); // ´òÓ¡Ã¿Ò»¸öÊı¾İ
     }
-    printf("\r\n"); // æ¢è¡Œ
+    printf("\r\n"); // »»ĞĞ
 }
 
 void ckeck_receive_data(void)
@@ -142,7 +144,7 @@ void ckeck_receive_data(void)
             (0 == memcmp(receive_message.rx_data, sack_frame, sizeof(sack_frame))))
         {
             printf("\r\ncheck receive data success , start send sack frame to slave !\r\n");
-            can_send_data(0xff, communication_id[g_slave_index].master_tx_id); // å›å¤ç¡®è®¤å¸§
+            can_send_data(0xff, communication_id[g_slave_index].master_tx_id); // »Ø¸´È·ÈÏÖ¡
         }
         else
         {
@@ -151,46 +153,63 @@ void ckeck_receive_data(void)
     }
     else if (ROLE < SLAVE_COUNT)
     {
-        // cppcheck-suppress arrayIndexOutOfBounds
-        if ((receive_message.rx_sfid == communication_id[ROLE].master_tx_id) &&
+        // ºÏ·¨Êı¾İ
+        if ((receive_message.rx_sfid == communication_id[ROLE].slave_rx_id) &&
             (CAN_FF_STANDARD == receive_message.rx_ff) &&
-            (8 == receive_message.rx_dlen) &&
-            (0 == memcmp(receive_message.rx_data, data_frame, sizeof(sack_frame))))
+            (8 == receive_message.rx_dlen))
+
         {
-            printf("\r\ncheck receive data success , start send sack frame to master !\r\n");
-            // cppcheck-suppress arrayIndexOutOfBounds
-            can_send_data(0xff, communication_id[ROLE].slave_tx_id); // å›å¤ç¡®è®¤å¸§
+            if (0 == memcmp(receive_message.rx_data, data_frame, sizeof(data_frame))) // Êı¾İÖ¡
+            {
+                printf("\r\ncheck receive data success , start send sack frame to master !\r\n");
+                can_send_data(0xff, communication_id[ROLE].slave_tx_id); // »Ø¸´È·ÈÏÖ¡
+                timer3_init(5);                                          // ¿ªÆô5ºÁÃë³¬Ê±¼ì²â
+                led_off(e_red_led);
+            }
+            else if (0 == memcmp(receive_message.rx_data, sack_frame, sizeof(sack_frame))) // È·ÈÏÖ¡
+            {
+                can_send_data(0xff, communication_id[ROLE].slave_tx_id); // »Ø¸´È·ÈÏÖ¡
+                g_master_ack_flag = SET;
+            }
+            else
+            {
+                g_master_ack_flag = RESET;
+            }
+        }
+        else
+        {
+            printf("\r\ncheck receive data fail !\r\n");
         }
     }
 }
 /*
- * å‡½æ•°åï¼šcan_config
- * åŠŸèƒ½æè¿°ï¼šé…ç½®CANæ€»çº¿
- * è¾“å…¥å‚æ•°ï¼šæ— 
- * è¾“å‡ºå‚æ•°ï¼šæ— 
+ * º¯ÊıÃû£ºcan_config
+ * ¹¦ÄÜÃèÊö£ºÅäÖÃCAN×ÜÏß
+ * ÊäÈë²ÎÊı£ºÎŞ
+ * Êä³ö²ÎÊı£ºÎŞ
  */
 void can_config(void)
 {
-    can_parameter_struct can_parameter;     // CANå‚æ•°ç»“æ„ä½“   
+    can_parameter_struct can_parameter;     // CAN²ÎÊı½á¹¹Ìå   
 
-    can_struct_para_init(CAN_INIT_STRUCT, &can_parameter); // åˆå§‹åŒ–CANå‚æ•°ç»“æ„ä½“
+    can_struct_para_init(CAN_INIT_STRUCT, &can_parameter); // ³õÊ¼»¯CAN²ÎÊı½á¹¹Ìå
 
-    /* åˆå§‹åŒ–CANå¯„å­˜å™¨ */
+    /* ³õÊ¼»¯CAN¼Ä´æÆ÷ */
     can_deinit(CAN0);
 
-    /* é…ç½®CANå‚æ•° */
-    can_parameter.time_triggered = DISABLE;           // éæ—¶é—´è§¦å‘æ¨¡å¼
-    can_parameter.auto_bus_off_recovery = ENABLE;     // è‡ªåŠ¨æ€»çº¿å…³é—­æ¢å¤
-    can_parameter.auto_wake_up = DISABLE;             // ä¸è‡ªåŠ¨å”¤é†’
-    can_parameter.auto_retrans = ENABLE;              // è‡ªåŠ¨é‡ä¼ 
-    can_parameter.rec_fifo_overwrite = DISABLE;       // æ¥æ”¶FIFOä¸æº¢å‡º
-    can_parameter.trans_fifo_order = DISABLE;         // å‘é€FIFOä¸æŒ‰é¡ºåº
-    can_parameter.working_mode = CAN_NORMAL_MODE;     // æ­£å¸¸å·¥ä½œæ¨¡å¼
-    can_parameter.resync_jump_width = CAN_BT_SJW_1TQ; // é‡æ–°åŒæ­¥è·³è½¬å®½åº¦
-    can_parameter.time_segment_1 = CAN_BT_BS1_7TQ;    // æ—¶é—´æ®µ1
-    can_parameter.time_segment_2 = CAN_BT_BS2_2TQ;    // æ—¶é—´æ®µ2
+    /* ÅäÖÃCAN²ÎÊı */
+    can_parameter.time_triggered = DISABLE;           // ·ÇÊ±¼ä´¥·¢Ä£Ê½
+    can_parameter.auto_bus_off_recovery = ENABLE;     // ×Ô¶¯×ÜÏß¹Ø±Õ»Ö¸´
+    can_parameter.auto_wake_up = DISABLE;             // ²»×Ô¶¯»½ĞÑ
+    can_parameter.auto_retrans = ENABLE;              // ×Ô¶¯ÖØ´«
+    can_parameter.rec_fifo_overwrite = DISABLE;       // ½ÓÊÕFIFO²»Òç³ö
+    can_parameter.trans_fifo_order = DISABLE;         // ·¢ËÍFIFO²»°´Ë³Ğò
+    can_parameter.working_mode = CAN_NORMAL_MODE;     // Õı³£¹¤×÷Ä£Ê½
+    can_parameter.resync_jump_width = CAN_BT_SJW_1TQ; // ÖØĞÂÍ¬²½Ìø×ª¿í¶È
+    can_parameter.time_segment_1 = CAN_BT_BS1_7TQ;    // Ê±¼ä¶Î1
+    can_parameter.time_segment_2 = CAN_BT_BS2_2TQ;    // Ê±¼ä¶Î2
 
-    /* è®¾ç½®æ³¢ç‰¹ç‡ */
+    /* ÉèÖÃ²¨ÌØÂÊ */
 #if CAN_BAUDRATE == 1000
     can_parameter.prescaler = 6; // 1MBps
 #elif CAN_BAUDRATE == 500
@@ -209,41 +228,41 @@ void can_config(void)
 #error "please select list can baudrate in private defines in main.c "
 #endif
 
-    /* åˆå§‹åŒ–CAN */
+    /* ³õÊ¼»¯CAN */
     can_init(CAN0, &can_parameter);   
 
     init_can0_filter(); 
 
-    can_interrupt_enable(CAN0, CAN_INT_RFNE0); // ä½¿èƒ½CAN0çš„æ¥æ”¶FIFO0éç©ºä¸­æ–­
+    can_interrupt_enable(CAN0, CAN_INT_RFNE0); // Ê¹ÄÜCAN0µÄ½ÓÊÕFIFO0·Ç¿ÕÖĞ¶Ï
 
     printf("\r\nconfigure can success !\r\n");
 }
 
 void init_can0_filter(void)
 {
-    can_struct_para_init(CAN_FILTER_STRUCT, &can_filter); // åˆå§‹åŒ–CANæ»¤æ³¢å™¨å‚æ•°ç»“æ„ä½“
-    /* è®¾ç½®CANè¿‡æ»¤å™¨å‚æ•° */
-    can_filter.filter_number = 0;                  // è®¾ç½®è¿‡æ»¤å™¨ç¼–å·ï¼Œè¿™é‡Œæ˜¯è¿‡æ»¤å™¨0
-    can_filter.filter_mode = CAN_FILTERMODE_MASK;  // è®¾ç½®è¿‡æ»¤å™¨æ¨¡å¼ä¸ºå±è”½æ¨¡å¼
-    can_filter.filter_bits = CAN_FILTERBITS_32BIT; // è®¾ç½®è¿‡æ»¤å™¨ä½å®½ä¸º32ä½
-    can_filter.filter_list_high = 0x0000;          // é«˜16ä½è¿‡æ»¤å™¨åˆ—è¡¨è®¾ç½®ä¸º0
-    can_filter.filter_list_low = 0x0000;           // ä½16ä½è¿‡æ»¤å™¨åˆ—è¡¨è®¾ç½®ä¸º0
-    can_filter.filter_mask_high = 0x0000;          // é«˜16ä½è¿‡æ»¤å™¨æ©ç è®¾ç½®ä¸º0
-    can_filter.filter_mask_low = 0x0000;           // ä½16ä½è¿‡æ»¤å™¨æ©ç è®¾ç½®ä¸º0
-    can_filter.filter_fifo_number = CAN_FIFO0;     // è®¾ç½®è¿‡æ»¤å™¨çš„FIFOä¸ºFIFO0
-    can_filter.filter_enable = ENABLE;             // ä½¿èƒ½è¿‡æ»¤å™¨
+    can_struct_para_init(CAN_FILTER_STRUCT, &can_filter); // ³õÊ¼»¯CANÂË²¨Æ÷²ÎÊı½á¹¹Ìå
+    /* ÉèÖÃCAN¹ıÂËÆ÷²ÎÊı */
+    can_filter.filter_number = 0;                  // ÉèÖÃ¹ıÂËÆ÷±àºÅ£¬ÕâÀïÊÇ¹ıÂËÆ÷0
+    can_filter.filter_mode = CAN_FILTERMODE_MASK;  // ÉèÖÃ¹ıÂËÆ÷Ä£Ê½ÎªÆÁ±ÎÄ£Ê½
+    can_filter.filter_bits = CAN_FILTERBITS_32BIT; // ÉèÖÃ¹ıÂËÆ÷Î»¿íÎª32Î»
+    can_filter.filter_list_high = 0x0000;          // ¸ß16Î»¹ıÂËÆ÷ÁĞ±íÉèÖÃÎª0
+    can_filter.filter_list_low = 0x0000;           // µÍ16Î»¹ıÂËÆ÷ÁĞ±íÉèÖÃÎª0
+    can_filter.filter_mask_high = 0x0000;          // ¸ß16Î»¹ıÂËÆ÷ÑÚÂëÉèÖÃÎª0
+    can_filter.filter_mask_low = 0x0000;           // µÍ16Î»¹ıÂËÆ÷ÑÚÂëÉèÖÃÎª0
+    can_filter.filter_fifo_number = CAN_FIFO0;     // ÉèÖÃ¹ıÂËÆ÷µÄFIFOÎªFIFO0
+    can_filter.filter_enable = ENABLE;             // Ê¹ÄÜ¹ıÂËÆ÷
 
-    can_filter_init(&can_filter); // åˆå§‹åŒ–CANè¿‡æ»¤å™¨
+    can_filter_init(&can_filter); // ³õÊ¼»¯CAN¹ıÂËÆ÷
 
     printf("\r\n init can0 filter success !\r\n");
 }
 
 void config_can0_filter(uint16_t filter_id)
 {
-    can_filter.filter_list_high = 0x0000;   // è¿‡æ»¤å™¨åˆ—è¡¨é«˜ä½ä¸ºç©º
-    can_filter.filter_list_low = filter_id; // è¿‡æ»¤å™¨åˆ—è¡¨ä½ä½ä¸º0x01
-    can_filter.filter_mask_high = 0x0000;   // æ©ç é«˜ä½ä¸º0
-    can_filter.filter_mask_low = 0xFF00;    // æ©ç ä½ä½ä¸º0xFF00ï¼Œè¡¨ç¤ºåªåŒ¹é…IDä½8ä½
+    can_filter.filter_list_high = 0x0000;   // ¹ıÂËÆ÷ÁĞ±í¸ßÎ»Îª¿Õ
+    can_filter.filter_list_low = filter_id; // ¹ıÂËÆ÷ÁĞ±íµÍÎ»Îª0x01
+    can_filter.filter_mask_high = 0x0000;   // ÑÚÂë¸ßÎ»Îª0
+    can_filter.filter_mask_low = 0xFF00;    // ÑÚÂëµÍÎ»Îª0xFF00£¬±íÊ¾Ö»Æ¥ÅäIDµÍ8Î»
 
     printf("\r\n config filter id : %02x  !\r\n", can_filter.filter_list_low);
 }
@@ -256,11 +275,11 @@ void config_can0_filter(uint16_t filter_id)
 */
 void nvic_config(void)
 {
-    /* é…ç½®CAN0 NVIC */
+    /* ÅäÖÃCAN0 NVIC */
     nvic_irq_enable(USBD_LP_CAN0_RX0_IRQn, 0, 0);
     printf("\r\nCAN0 NVIC config success !\r\n");
 
-    /* é…ç½®å®šæ—¶å™¨3 NVIC */
+    /* ÅäÖÃ¶¨Ê±Æ÷3 NVIC */
     nvic_irq_enable(TIMER3_IRQn, 1, 0);
     printf("\r\ntimer3 NVIC config success !\r\n");
 }
@@ -291,7 +310,7 @@ void led_off(LED_e led)
 
 void led_twinkle(LED_e led)
 {
-    for (uint8_t i = 0; i < 4; i++)
+    for (uint8_t i = 0; i < 3; i++)
     {
         led_on(led);
         accurate_delay_ms(200);
@@ -303,11 +322,11 @@ void led_init(void)
 {
 
     rcu_periph_clock_enable(RCU_GPIOB);
-    /* åˆå§‹åŒ–ç»¿è‰²led*/
+    /* ³õÊ¼»¯ÂÌÉ«led*/
     gpio_init(GPIOB, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_10);
     led_off(e_green_led);
 
-    /* åˆå§‹åŒ–çº¢è‰²led*/
+    /* ³õÊ¼»¯ºìÉ«led*/
     gpio_init(GPIOB, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_11);
     led_off(e_red_led);
 
@@ -316,20 +335,20 @@ void led_init(void)
 
 /**
 
-@brief CANæ¨¡å—çš„GPIOå¼•è„šé…ç½®å‡½æ•°
+@brief CANÄ£¿éµÄGPIOÒı½ÅÅäÖÃº¯Êı
 **/
 void can_gpio_config(void)
 {
-    /* ä½¿èƒ½CAN0å’ŒGPIOBæ—¶é’Ÿ */
+    /* Ê¹ÄÜCAN0ºÍGPIOBÊ±ÖÓ */
     rcu_periph_clock_enable(RCU_CAN0);  
     rcu_periph_clock_enable(RCU_GPIOB); 
 
-    /* é…ç½®PB8å’ŒPB9ä¸ºCAN0çš„RXå’ŒTXå¼•è„š */
+    /* ÅäÖÃPB8ºÍPB9ÎªCAN0µÄRXºÍTXÒı½Å */
     gpio_init(GPIOB, GPIO_MODE_IPU, GPIO_OSPEED_50MHZ, GPIO_PIN_8);  // RX
     gpio_init(GPIOB, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_9); // TX
 }
 
-/* é‡æ˜ å°„æ‰“å°å‡½æ•°åˆ°ä¸²å£0 */
+/* ÖØÓ³Éä´òÓ¡º¯Êıµ½´®¿Ú0 */
 int fputc(int ch, FILE *f)
 {
     usart_data_transmit(USART0, (uint8_t)ch);
@@ -340,7 +359,7 @@ int fputc(int ch, FILE *f)
 
 /*!
 
-@brief åˆå§‹åŒ–ä¸²å£0
+@brief ³õÊ¼»¯´®¿Ú0
 
 @param none
 
@@ -348,79 +367,79 @@ int fputc(int ch, FILE *f)
 */
 void uart0_init(void)
 {
-    /* ä½¿èƒ½GPIOæ—¶é’Ÿ */
+    /* Ê¹ÄÜGPIOÊ±ÖÓ */
     rcu_periph_clock_enable(RCU_GPIOA);
 
-    /* ä½¿èƒ½USARTæ—¶é’Ÿ */
+    /* Ê¹ÄÜUSARTÊ±ÖÓ */
     rcu_periph_clock_enable(RCU_USART0);
 
-    /*åˆå§‹åŒ–å‘é€ç®¡è„š */
+    /*³õÊ¼»¯·¢ËÍ¹Ü½Å */
     gpio_init(GPIOA, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_9);
 
-    /* åˆå§‹åŒ–æ¥æ”¶ç®¡è„š */
+    /* ³õÊ¼»¯½ÓÊÕ¹Ü½Å */
     gpio_init(GPIOA, GPIO_MODE_IN_FLOATING, GPIO_OSPEED_50MHZ, GPIO_PIN_10);
 
-    /* USART é…ç½® */
-    usart_deinit(USART0);                                 // å°† USART0 å¤–è®¾çš„å¯„å­˜å™¨æ¢å¤åˆ°å¤ä½å€¼ï¼Œç¡®ä¿å¤–è®¾ä»¥æœ€åˆçš„çŠ¶æ€å¼€å§‹é…ç½®ã€‚
-    usart_baudrate_set(USART0, 115200U);                  // è®¾ç½® USART0 çš„æ³¢ç‰¹ç‡ä¸º 115200ã€‚
-    usart_receive_config(USART0, USART_RECEIVE_ENABLE);   // ä½¿èƒ½ USART0 çš„æ¥æ”¶åŠŸèƒ½ã€‚
-    usart_transmit_config(USART0, USART_TRANSMIT_ENABLE); // ä½¿èƒ½ USART0 çš„å‘é€åŠŸèƒ½ã€‚
-    usart_enable(USART0);                                 // ä½¿èƒ½ USART0 å¤–è®¾ã€‚
+    /* USART ÅäÖÃ */
+    usart_deinit(USART0);                                 // ½« USART0 ÍâÉèµÄ¼Ä´æÆ÷»Ö¸´µ½¸´Î»Öµ£¬È·±£ÍâÉèÒÔ×î³õµÄ×´Ì¬¿ªÊ¼ÅäÖÃ¡£
+    usart_baudrate_set(USART0, 115200U);                  // ÉèÖÃ USART0 µÄ²¨ÌØÂÊÎª 115200¡£
+    usart_receive_config(USART0, USART_RECEIVE_ENABLE);   // Ê¹ÄÜ USART0 µÄ½ÓÊÕ¹¦ÄÜ¡£
+    usart_transmit_config(USART0, USART_TRANSMIT_ENABLE); // Ê¹ÄÜ USART0 µÄ·¢ËÍ¹¦ÄÜ¡£
+    usart_enable(USART0);                                 // Ê¹ÄÜ USART0 ÍâÉè¡£
 }
 
 /**
 
-@brief è¯¥å‡½æ•°ä½¿ç”¨äº†å®šæ—¶å™¨2æ¥å®ç°æ¯«ç§’çº§å»¶è¿Ÿï¼ŒåŒæ—¶ä¸ä¼šå½±å“CAN0ä¸­æ–­ã€‚å‡½æ•°çš„å‚æ•°mså¯ä»¥æŒ‡å®šå»¶è¿Ÿçš„æ¯«ç§’æ•°ï¼Œæœ€å¤§å»¶è¿Ÿæ—¶é—´ä¸º6553.5æ¯«ç§’
+@brief ¸Ãº¯ÊıÊ¹ÓÃÁË¶¨Ê±Æ÷2À´ÊµÏÖºÁÃë¼¶ÑÓ³Ù£¬Í¬Ê±²»»áÓ°ÏìCAN0ÖĞ¶Ï¡£º¯ÊıµÄ²ÎÊıms¿ÉÒÔÖ¸¶¨ÑÓ³ÙµÄºÁÃëÊı£¬×î´óÑÓ³ÙÊ±¼äÎª6553.5ºÁÃë
 
-@param ms: å»¶æ—¶çš„æ¯«ç§’æ•°
+@param ms: ÑÓÊ±µÄºÁÃëÊı
 
 @retval None
 **/
 void accurate_delay_ms(uint16_t ms)
 {
-    rcu_periph_clock_enable(RCU_TIMER2); // ä½¿èƒ½å®šæ—¶å™¨ 2 æ—¶é’Ÿ
+    rcu_periph_clock_enable(RCU_TIMER2); // Ê¹ÄÜ¶¨Ê±Æ÷ 2 Ê±ÖÓ
 
     timer_parameter_struct timer_initpara;
-    timer_struct_para_init(&timer_initpara); // ä½¿ç”¨é»˜è®¤å€¼åˆå§‹åŒ–å®šæ—¶å™¨é…ç½®
+    timer_struct_para_init(&timer_initpara); // Ê¹ÓÃÄ¬ÈÏÖµ³õÊ¼»¯¶¨Ê±Æ÷ÅäÖÃ
 
-    timer_initpara.prescaler = SystemCoreClock / 10000 - 1; // å®šæ—¶å™¨ 2 æ—¶é’Ÿé¢‘ç‡ä¸ºç³»ç»Ÿæ—¶é’Ÿé¢‘ç‡çš„ 1/10000
+    timer_initpara.prescaler = SystemCoreClock / 10000 - 1; // ¶¨Ê±Æ÷ 2 Ê±ÖÓÆµÂÊÎªÏµÍ³Ê±ÖÓÆµÂÊµÄ 1/10000
     timer_initpara.alignedmode = TIMER_COUNTER_EDGE;
     timer_initpara.counterdirection = TIMER_COUNTER_UP;
-    timer_initpara.period = ms * 10;     // å®šæ—¶å™¨ 2 çš„å‘¨æœŸä¸ºéœ€è¦å»¶æ—¶çš„æ¯«ç§’æ•°ä¹˜ä»¥ 10ï¼ˆå› ä¸ºæ—¶é’Ÿé¢‘ç‡ä¸º 1/10000ï¼‰
-    timer_init(TIMER2, &timer_initpara); // åˆå§‹åŒ–å®šæ—¶å™¨ 2
+    timer_initpara.period = ms * 10;     // ¶¨Ê±Æ÷ 2 µÄÖÜÆÚÎªĞèÒªÑÓÊ±µÄºÁÃëÊı³ËÒÔ 10£¨ÒòÎªÊ±ÖÓÆµÂÊÎª 1/10000£©
+    timer_init(TIMER2, &timer_initpara); // ³õÊ¼»¯¶¨Ê±Æ÷ 2
 
-    timer_flag_clear(TIMER2, TIMER_FLAG_UP); // æ¸…é™¤å®šæ—¶å™¨ 2 çš„è®¡æ•°æ ‡å¿—ä½
-    timer_enable(TIMER2);                    // å¯åŠ¨å®šæ—¶å™¨ 2
+    timer_flag_clear(TIMER2, TIMER_FLAG_UP); // Çå³ı¶¨Ê±Æ÷ 2 µÄ¼ÆÊı±êÖ¾Î»
+    timer_enable(TIMER2);                    // Æô¶¯¶¨Ê±Æ÷ 2
 
     while (!timer_flag_get(TIMER2, TIMER_FLAG_UP))
     {
-    } // ç­‰å¾…å®šæ—¶å™¨ 2 è®¡æ•°åˆ° 0
+    } // µÈ´ı¶¨Ê±Æ÷ 2 ¼ÆÊıµ½ 0
 
-    timer_disable(TIMER2);                // åœæ­¢å®šæ—¶å™¨ 2
-    rcu_periph_clock_disable(RCU_TIMER2); // å…³é—­å®šæ—¶å™¨ 2 æ—¶é’Ÿ
+    timer_disable(TIMER2);                // Í£Ö¹¶¨Ê±Æ÷ 2
+    rcu_periph_clock_disable(RCU_TIMER2); // ¹Ø±Õ¶¨Ê±Æ÷ 2 Ê±ÖÓ
 }
 
 /*!
-\brief CAN0æ¥æ”¶ä¸­æ–­å‡½æ•°
-\param[in] æ— 
-\param[out] æ— 
-\retval æ— 
+\brief CAN0½ÓÊÕÖĞ¶Ïº¯Êı
+\param[in] ÎŞ
+\param[out] ÎŞ
+\retval ÎŞ
 */
 
 void USBD_LP_CAN0_RX0_IRQHandler(void)
 {
-    can_message_receive(CAN0, CAN_FIFO0, &receive_message); // è¯»å–CAN0çš„æ¥æ”¶ç¼“å­˜FIFO0ä¸­çš„æ¶ˆæ¯åˆ°ç»“æ„ä½“receive_messageä¸­
+    can_message_receive(CAN0, CAN_FIFO0, &receive_message); // ¶ÁÈ¡CAN0µÄ½ÓÊÕ»º´æFIFO0ÖĞµÄÏûÏ¢µ½½á¹¹Ìåreceive_messageÖĞ
 
-    led_twinkle(e_green_led); // ç»¿è‰²æŒ‡ç¤ºç¯é—ªçƒ
+    led_twinkle(e_green_led); // ÂÌÉ«Ö¸Ê¾µÆÉÁË¸
 
-    ckeck_receive_data();//åˆ¤æ–­æ˜¯å¦ç¬¦åˆé€šä¿¡åè®®
+    ckeck_receive_data();//ÅĞ¶ÏÊÇ·ñ·ûºÏÍ¨ĞÅĞ­Òé
 
     printf("\r\nrx [%02x]: ", receive_message.rx_sfid);
-    for (uint8_t i = 0; i < receive_message.rx_dlen; i++) // éå†å‘é€æ•°æ®
+    for (uint8_t i = 0; i < receive_message.rx_dlen; i++) // ±éÀú·¢ËÍÊı¾İ
     {
-        printf("%02x ", receive_message.rx_data[i]); // æ‰“å°æ¯ä¸€ä¸ªæ•°æ®
+        printf("%02x ", receive_message.rx_data[i]); // ´òÓ¡Ã¿Ò»¸öÊı¾İ
     }
-    printf("\r\n"); // æ¢è¡Œ
+    printf("\r\n"); // »»ĞĞ
 }
 
 void init_communication_id(void)
@@ -438,28 +457,40 @@ void TIMER3_IRQHandler(void)
 {
     if (timer_flag_get(TIMER3, TIMER_FLAG_UP) == SET)
     {
-        timer_flag_clear(TIMER3, TIMER_FLAG_UP);
-        master_task(g_slave_index); // æ¯5ç§’è°ƒç”¨ä¸€æ¬¡å‘¨æœŸä»»åŠ¡
+        if (ROLE == e_master) // Ö÷½Úµã
+        {
+            timer_flag_clear(TIMER3, TIMER_FLAG_UP);
+            master_task(g_slave_index); // Ã¿5Ãëµ÷ÓÃÒ»´ÎÖÜÆÚÈÎÎñ
+        }
+        else // ´Ó½Úµã
+        {
+            /* ´Ó½Úµã³¬Ê±¼ì²â */
+            if (g_master_ack_flag == RESET)
+            {
+                led_on(e_red_led); // ³¬Ê±£¬µãÁÁºìµÆ
+                printf("\r\n[%d]: wait master sack time out !\r\n", ROLE);
+            }
+        }
     }
 }
 
 void timer3_init(uint32_t period)
 {
-    /* ä½¿èƒ½å®šæ—¶å™¨3æ—¶é’Ÿ */
+    /* Ê¹ÄÜ¶¨Ê±Æ÷3Ê±ÖÓ */
     rcu_periph_clock_enable(RCU_TIMER3);
 
-    /* å®šæ—¶å™¨3çš„åŸºæœ¬é…ç½® */
+    /* ¶¨Ê±Æ÷3µÄ»ù±¾ÅäÖÃ */
     timer_parameter_struct timer_initpara;
     timer_struct_para_init(&timer_initpara);
     timer_initpara.prescaler = SystemCoreClock / 10000 - 1;
     timer_initpara.alignedmode = TIMER_COUNTER_EDGE;
     timer_initpara.counterdirection = TIMER_COUNTER_UP;
-    timer_initpara.period = period * 10;  // æ¯periodæ¯«ç§’è§¦å‘ä¸€æ¬¡ä¸­æ–­
+    timer_initpara.period = period * 10;  // Ã¿periodºÁÃë´¥·¢Ò»´ÎÖĞ¶Ï
     timer_init(TIMER3, &timer_initpara);
 
-    /* ä½¿èƒ½å®šæ—¶å™¨3ä¸­æ–­ */
+    /* Ê¹ÄÜ¶¨Ê±Æ÷3ÖĞ¶Ï */
     timer_interrupt_enable(TIMER3, TIMER_INT_UP);
 
-    /* å¯åŠ¨å®šæ—¶å™¨3 */
+    /* Æô¶¯¶¨Ê±Æ÷3 */
     timer_enable(TIMER3);
 }
